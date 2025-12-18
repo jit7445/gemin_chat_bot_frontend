@@ -17,6 +17,7 @@ export function InputBar({ onSendMessage, isLoading }: InputBarProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleSubmit = (e: FormEvent) => {
+    console.log("Submitting message:", message, "with file:", selectedFile);
     e.preventDefault()
     if (message.trim() || selectedFile) {
       onSendMessage(message, selectedFile || undefined)
