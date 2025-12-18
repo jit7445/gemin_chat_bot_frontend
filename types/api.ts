@@ -1,4 +1,4 @@
-import type { Message } from "./message" // Assuming Message is declared in another file
+import type { Message } from "./chat"
 
 export interface SendMessageRequest {
   chatId: string
@@ -8,6 +8,7 @@ export interface SendMessageRequest {
 
 export interface SendMessageResponse {
   message: Message
+  botMessage?: Message 
   success: boolean
 }
 

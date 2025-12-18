@@ -20,20 +20,16 @@ export function useChat(chatId: string) {
       try {
         const response = await api.sendMessage({ chatId, content, file })
 
+        const newMessages = [response.message]
+        if (response.botMessage) {
+          newMessages.push(response.botMessage)
+        }
+
         setState((prev) => ({
           ...prev,
-          messages: [...prev.messages, response.message],
+          messages: [...prev.messages, ...newMessages],
           isLoading: false,
         }))
-
-        // Simulate receiving a response
-        setTimeout(async () => {
-          const responseMessage = await api.getResponse(content)
-          setState((prev) => ({
-            ...prev,
-            messages: [...prev.messages, responseMessage],
-          }))
-        }, 1000)
       } catch (error) {
         setState((prev) => ({
           ...prev,
@@ -45,8 +41,16 @@ export function useChat(chatId: string) {
     [chatId],
   )
 
-  const clearMessages = useCallback(() => {
-    setState((prev) => ({ ...prev, messages: [] }))
+  const clearMessages = useCallback(async () => {
+    setState((prev) => ({ ...prev, messages: [], isLoading: true }))
+
+    try {
+      await api.resetChat()
+      setState((prev) => ({ ...prev, isLoading: false }))
+    } catch (error) {
+      console.error("Error resetting chat:", error)
+      setState((prev) => ({ ...prev, isLoading: false }))
+    }
   }, [])
 
   return {
