@@ -4,79 +4,93 @@ import type { Message } from "@/types/chat"
 const API_BASE_URL = "http://localhost:7777"
 
 export const api = {
- async sendMessage(request: SendMessageRequest): Promise<SendMessageResponse> {
-  try {
-    const userMessage: Message = {
-      id: `msg_${Date.now()}`,
-      content: request.content,
-      sender: "user",
-      timestamp: new Date(),
-    }
-
-    let botResponse: any
-    if (request.file) {
-      const formData = new FormData()
-      const fileType = request.file.type
-
-      let endpoint = ""
-      let fileKey = ""
-
-      if (fileType.startsWith("image/")) {
-        endpoint = `${API_BASE_URL}/api/chat/image`
-        fileKey = "image"
-      } else if (fileType === "application/pdf" || fileType === "text/plain") {
-        endpoint = `${API_BASE_URL}/api/chat/document`
-        fileKey = "file"
-      } else {
-        throw new Error(`Unsupported file type: ${fileType}`)
+  async sendMessage(
+    request: SendMessageRequest
+  ): Promise<SendMessageResponse> {
+    try {
+      // Create user message immediately
+      const userMessage: Message = {
+        id: `msg_${Date.now()}`,
+        content: request.content,
+        sender: "user",
+        timestamp: new Date(),
       }
 
-      formData.append(fileKey, request.file)
+      // 1️⃣ Upload file first (if exists)
+      if (request.file) {
+        const formData = new FormData()
+        const fileType = request.file.type
 
-      const uploadRes = await fetch(endpoint, {
+        let endpoint = ""
+        let fileKey = ""
+
+        if (fileType.startsWith("image/")) {
+          endpoint = `${API_BASE_URL}/api/chat/image`
+          fileKey = "image"
+        } else if (
+          fileType === "application/pdf" ||
+          fileType === "text/plain"
+        ) {
+          endpoint = `${API_BASE_URL}/api/chat/document`
+          fileKey = "file"
+        } else {
+          throw new Error(`Unsupported file type: ${fileType}`)
+        }
+
+        formData.append(fileKey, request.file)
+
+        const uploadRes = await fetch(endpoint, {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!uploadRes.ok) {
+          throw new Error("File upload failed")
+        }
+        userMessage.fileName = request.file.name
+        userMessage.fileType = request.file.type
+        userMessage.fileUrl = URL.createObjectURL(request.file)
+      }
+      const response = await fetch(`${API_BASE_URL}/api/chat/message`, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: request.content,
+        }),
       })
 
-      if (!uploadRes.ok) {
-        throw new Error("File upload failed")
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`)
       }
-      userMessage.fileName = request.file.name
-      userMessage.fileType = request.file.type
-      userMessage.fileUrl = URL.createObjectURL(request.file)
+
+      const botResponse = await response.json()
+
+      const botMessage: Message = {
+        id: `msg_${Date.now()}_bot`,
+        content: botResponse.reply ?? "No response from bot",
+        sender: "other",
+        timestamp: new Date(),
+      }
+
+      return {
+        message: userMessage,
+        botMessage,
+        success: true,
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      throw error
     }
-    const response = await fetch(`${API_BASE_URL}/api/chat/message`, {
+  },
+  async resetChat(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/chat/reset`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: request.content,
-      }),
     })
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`)
+      throw new Error(`Reset error: ${response.statusText}`)
     }
-
-    botResponse = await response.json()
-
-    const botMessage: Message = {
-      id: `msg_${Date.now()}_bot`,
-      content: botResponse.reply || "No response from bot",
-      sender: "other",
-      timestamp: new Date(),
-    }
-
-    return {
-      message: userMessage,
-      botMessage,
-      success: true,
-    }
-  } catch (error) {
-    console.error("Error sending message:", error)
-    throw error
-  }
-}
-
+  },
 }
